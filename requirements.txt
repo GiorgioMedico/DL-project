@@ -1,0 +1,21 @@
+# Core deep learning libraries
+tensorflow>=2.0.0
+keras>=2.0.0
+numpy>=1.19.0
+
+# Visualization and image processing
+matplotlib>=3.0.0
+opencv-python>=4.0.0
+
+# Data handling and utilities
+networkx>=2.0
+datasets>=1.0.0
+tensorflow-datasets>=4.0.0
+tqdm>=4.0.0
+
+# Jupyter environment
+jupyterlab>=3.0.0
+ipykernel>=6.0.0
+
+# Additional common ML libraries
+scikit-learn>=1.0.0
