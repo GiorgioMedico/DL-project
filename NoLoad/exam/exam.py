@@ -24,8 +24,12 @@ SOS_ID = token_to_id['SOS']
 MAX_DEPTH = 3
 MAX_LEN = 4*2**MAX_DEPTH - 2
 
+print("="*60)
+print("INFIX TO POSTFIX NEURAL NETWORK TRANSLATION")
+print("="*60)
 print(f"Vocabulary size: {VOCAB_SIZE}")
 print(f"Maximum sequence length: {MAX_LEN}")
+print(f"Vocabulary: {VOCAB}")
 
 # -------------------- Expression Generation (Preserving Core Logic) --------------------
 def generate_infix_expression(max_depth):
@@ -138,7 +142,7 @@ def create_and_compile_model():
     model = create_efficient_encoder_decoder_model()
 
     param_count = model.count_params()
-    print(f"Model parameter count: {param_count:,}")
+    print(f"\nModel parameter count: {param_count:,}")
 
     if param_count > 2000000:
         print("WARNING: Exceeding 2M parameter limit. Adjusting architecture...")
@@ -158,50 +162,76 @@ def create_and_compile_model():
 
     return model
 
+def analyze_dataset(X, Y, dataset_name="Dataset"):
+    """Analyze and report dataset characteristics"""
+    print(f"\n{dataset_name} Analysis:")
+    print(f"  Number of samples: {len(X):,}")
+    
+    # Analyze sequence lengths
+    input_lengths = [np.sum(x != PAD_ID) for x in X]
+    output_lengths = [np.sum(y != PAD_ID) for y in Y]
+    
+    print(f"  Input sequence lengths:")
+    print(f"    Mean: {np.mean(input_lengths):.2f}, Std: {np.std(input_lengths):.2f}")
+    print(f"    Range: {np.min(input_lengths)} to {np.max(input_lengths)}")
+    
+    print(f"  Output sequence lengths:")
+    print(f"    Mean: {np.mean(output_lengths):.2f}, Std: {np.std(output_lengths):.2f}")
+    print(f"    Range: {np.min(output_lengths)} to {np.max(output_lengths)}")
+    
+    # Analyze complexity distribution
+    complex_expressions = np.sum(np.array(output_lengths) > 5)
+    print(f"  Complex expressions (>5 tokens): {complex_expressions} ({complex_expressions/len(output_lengths)*100:.1f}%)")
+
 def train_model_with_documentation():
     """
     Train model with comprehensive documentation and history tracking
     """
-    print("="*60)
-    print("TRAINING PHASE DOCUMENTATION")
+    print("\n" + "="*60)
+    print("TRAINING PHASE")
     print("="*60)
 
     # Data generation
-    print("\n1. Data Generation")
-    print("Generating training dataset (10,000 samples)...")
+    print("\nGenerating datasets...")
     X_train, Y_train = generate_dataset(10000)
     decoder_input_train = shift_right(Y_train)
 
-    print("Generating validation dataset (1,000 samples)...")
     X_val, Y_val = generate_dataset(1000)
     decoder_input_val = shift_right(Y_val)
 
-    # Analyze data distribution
-    train_lengths = [np.sum(y != PAD_ID) for y in Y_train]
-    print(f"Training data statistics:")
-    print(f"  - Average output length: {np.mean(train_lengths):.2f}")
-    print(f"  - Length range: {np.min(train_lengths)} to {np.max(train_lengths)}")
-    print(f"  - Complex expressions (>5 tokens): {np.sum(np.array(train_lengths) > 5)} ({np.sum(np.array(train_lengths) > 5)/len(train_lengths)*100:.1f}%)")
+    # Analyze datasets
+    analyze_dataset(X_train, Y_train, "Training Dataset")
+    analyze_dataset(X_val, Y_val, "Validation Dataset")
 
     # Model creation
-    print("\n2. Model Architecture")
+    print(f"\n{'-'*40}")
+    print("MODEL ARCHITECTURE")
+    print(f"{'-'*40}")
     model = create_and_compile_model()
     model.summary()
 
     # Training configuration
-    print("\n3. Training Configuration")
+    print(f"\n{'-'*40}")
+    print("TRAINING CONFIGURATION")
+    print(f"{'-'*40}")
+    
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=8, restore_best_weights=True, verbose=1),
         ReduceLROnPlateau(monitor='val_loss', factor=0.7, patience=4, min_lr=1e-6, verbose=1)
     ]
 
-    print("Callbacks configured:")
+    print("Optimizer: Adam (lr=0.002, clipnorm=1.0)")
+    print("Loss function: sparse_categorical_crossentropy")
+    print("Batch size: 64")
+    print("Max epochs: 50")
+    print("Callbacks:")
     print("  - Early stopping: patience=8, monitor=val_loss")
     print("  - Learning rate reduction: factor=0.7, patience=4")
 
     # Training execution
-    print("\n4. Training Execution")
-    print("Starting training...")
+    print(f"\n{'-'*40}")
+    print("TRAINING EXECUTION")
+    print(f"{'-'*40}")
 
     history = model.fit(
         [X_train, decoder_input_train], Y_train,
@@ -213,17 +243,22 @@ def train_model_with_documentation():
     )
 
     # Training analysis
-    print("\n5. Training Results Analysis")
+    print(f"\n{'-'*40}")
+    print("TRAINING RESULTS")
+    print(f"{'-'*40}")
     final_train_acc = history.history['accuracy'][-1]
     final_val_acc = history.history['val_accuracy'][-1]
     final_train_loss = history.history['loss'][-1]
     final_val_loss = history.history['val_loss'][-1]
+    best_val_acc = max(history.history['val_accuracy'])
+    epochs_trained = len(history.history['loss'])
 
+    print(f"Training completed after {epochs_trained} epochs")
     print(f"Final training accuracy: {final_train_acc:.4f}")
     print(f"Final validation accuracy: {final_val_acc:.4f}")
+    print(f"Best validation accuracy: {best_val_acc:.4f}")
     print(f"Final training loss: {final_train_loss:.4f}")
     print(f"Final validation loss: {final_val_loss:.4f}")
-    print(f"Total epochs trained: {len(history.history['loss'])}")
 
     return model, history
 
@@ -274,100 +309,101 @@ def prefix_accuracy_single(y_true, y_pred, id_to_token, eos_id=EOS_ID, verbose=F
     score = match_len / max_len if max_len > 0 else 0
 
     if verbose:
-        print("TARGET :", ' '.join(t_tokens))
-        print("PREDICT:", ' '.join(p_tokens))
-        print(f"PREFIX MATCH: {match_len}/{max_len} → {score:.2f}")
+        print(f"TARGET : {' '.join(t_tokens)}")
+        print(f"PREDICT: {' '.join(p_tokens)}")
+        print(f"PREFIX MATCH: {match_len}/{max_len} → {score:.3f}")
 
     return score
 
 def test(model, no=20, rounds=10):
     """Evaluation function exactly as specified in exam requirements"""
+    print(f"Evaluating model performance on {no} expressions × {rounds} rounds...")
     rscores = []
     for i in range(rounds):
-        print(f"round = {i}")
+        print(f"Round {i+1}/{rounds}...")
         X_test, Y_test = generate_dataset(no)
         scores = []
         for j in range(no):
             encoder_input = X_test[j]
             generated = autoregressive_decode(model, encoder_input)[1:]  # remove SOS
             scores.append(prefix_accuracy_single(Y_test[j], generated, id_to_token))
-        rscores.append(np.mean(scores))
-    return np.mean(rscores), np.std(rscores)
+        round_mean = np.mean(scores)
+        rscores.append(round_mean)
+        print(f"  Round {i+1} accuracy: {round_mean:.4f}")
+    
+    final_mean = np.mean(rscores)
+    final_std = np.std(rscores)
+    print(f"\nEvaluation complete!")
+    print(f"Mean accuracy across all rounds: {final_mean:.4f}")
+    print(f"Standard deviation: {final_std:.4f}")
+    
+    return final_mean, final_std
 
 # -------------------- Visualization and Analysis --------------------
 def plot_training_history(history):
-    """Plot comprehensive training history"""
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
-
-    # Loss curves
-    ax1.plot(history.history['loss'], label='Training Loss', linewidth=2)
-    ax1.plot(history.history['val_loss'], label='Validation Loss', linewidth=2)
-    ax1.set_title('Training and Validation Loss')
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss')
-    ax1.legend()
+    """Plot comprehensive training history following examples from documents"""
+    
+    # Extract history data
+    loss_history = history.history['loss']
+    val_loss_history = history.history['val_loss']
+    acc_history = history.history['accuracy']
+    val_acc_history = history.history['val_accuracy']
+    
+    # Create figure with subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    
+    # Loss plot
+    ax1.plot(loss_history, label='Training Loss', linewidth=2, color='blue')
+    ax1.plot(val_loss_history, label='Validation Loss', linewidth=2, color='red')
+    ax1.set_title('Loss During Training', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('Epoch', fontsize=12)
+    ax1.set_ylabel('Loss', fontsize=12)
+    ax1.legend(fontsize=11)
     ax1.grid(True, alpha=0.3)
-
-    # Accuracy curves
-    ax2.plot(history.history['accuracy'], label='Training Accuracy', linewidth=2)
-    ax2.plot(history.history['val_accuracy'], label='Validation Accuracy', linewidth=2)
-    ax2.set_title('Training and Validation Accuracy')
-    ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Accuracy')
-    ax2.legend()
+    
+    # Accuracy plot  
+    ax2.plot(acc_history, label='Training Accuracy', linewidth=2, color='green')
+    ax2.plot(val_acc_history, label='Validation Accuracy', linewidth=2, color='orange')
+    ax2.set_title('Accuracy During Training', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('Epoch', fontsize=12)
+    ax2.set_ylabel('Accuracy', fontsize=12)
+    ax2.legend(fontsize=11)
     ax2.grid(True, alpha=0.3)
-
-    # Learning rate (if available)
-    if 'lr' in history.history:
-        ax3.plot(history.history['lr'], linewidth=2, color='orange')
-        ax3.set_title('Learning Rate Schedule')
-        ax3.set_xlabel('Epoch')
-        ax3.set_ylabel('Learning Rate')
-        ax3.set_yscale('log')
-        ax3.grid(True, alpha=0.3)
-    else:
-        ax3.text(0.5, 0.5, 'Learning Rate\nNot Tracked',
-                horizontalalignment='center', verticalalignment='center',
-                transform=ax3.transAxes, fontsize=14)
-        ax3.set_title('Learning Rate Schedule')
-
-    # Training metrics summary
-    final_loss = history.history['val_loss'][-1]
-    final_acc = history.history['val_accuracy'][-1]
-    best_acc = max(history.history['val_accuracy'])
-    epochs_trained = len(history.history['loss'])
-
-    summary_text = f"""Training Summary:
-
-Final Validation Loss: {final_loss:.4f}
-Final Validation Accuracy: {final_acc:.4f}
-Best Validation Accuracy: {best_acc:.4f}
-Total Epochs: {epochs_trained}
-
-Model converged successfully
-with early stopping."""
-
-    ax4.text(0.05, 0.95, summary_text, transform=ax4.transAxes, fontsize=11,
-             verticalalignment='top', fontfamily='monospace',
-             bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-    ax4.set_xlim(0, 1)
-    ax4.set_ylim(0, 1)
-    ax4.axis('off')
-    ax4.set_title('Training Summary')
-
+    
     plt.tight_layout()
     plt.show()
+    
+    # Print training summary
+    epochs_trained = len(loss_history)
+    final_train_loss = loss_history[-1]
+    final_val_loss = val_loss_history[-1]
+    final_train_acc = acc_history[-1]
+    final_val_acc = val_acc_history[-1]
+    best_val_acc = max(val_acc_history)
+    
+    print(f"\n{'-'*50}")
+    print("TRAINING SUMMARY")
+    print(f"{'-'*50}")
+    print(f"Total epochs trained: {epochs_trained}")
+    print(f"Final training loss: {final_train_loss:.4f}")
+    print(f"Final validation loss: {final_val_loss:.4f}")
+    print(f"Final training accuracy: {final_train_acc:.4f}")
+    print(f"Final validation accuracy: {final_val_acc:.4f}")
+    print(f"Best validation accuracy: {best_val_acc:.4f}")
 
-def demonstrate_model_performance(model, num_examples=8):
-    """Demonstrate model performance on sample expressions"""
-    print("\n" + "="*70)
+def demonstrate_model_performance(model, num_examples=10):
+    """Demonstrate model performance on sample expressions with improved formatting"""
+    print(f"\n{'='*70}")
     print("MODEL PERFORMANCE DEMONSTRATION")
-    print("="*70)
+    print(f"{'='*70}")
 
     X_demo, Y_demo = generate_dataset(num_examples)
 
     perfect_matches = 0
+    partial_matches = 0
     total_score = 0
+
+    print(f"Testing on {num_examples} randomly generated expressions:\n")
 
     for i in range(num_examples):
         encoder_input = X_demo[i]
@@ -383,19 +419,29 @@ def demonstrate_model_performance(model, num_examples=8):
 
         if score == 1.0:
             perfect_matches += 1
+            status = "✓ PERFECT"
+        elif score > 0.5:
+            partial_matches += 1
+            status = "~ PARTIAL"
+        else:
+            status = "✗ POOR"
 
-        print(f"\nExample {i+1}:")
-        print(f"Input (Infix):    {infix_str}")
-        print(f"Target (Postfix): {target_str}")
-        print(f"Generated:        {generated_str}")
-        print(f"Score:            {score:.3f}")
-        if score == 1.0:
-            print("✓ Perfect match!")
+        print(f"Example {i+1:2d}:")
+        print(f"  Input (Infix):     {infix_str}")
+        print(f"  Target (Postfix):  {target_str}")
+        print(f"  Generated:         {generated_str}")
+        print(f"  Score: {score:.3f}  [{status}]")
+        print()
 
     avg_score = total_score / num_examples
-    print(f"\nDemonstration Results:")
-    print(f"Average Score: {avg_score:.3f}")
-    print(f"Perfect Matches: {perfect_matches}/{num_examples} ({perfect_matches/num_examples*100:.1f}%)")
+    
+    print(f"{'-'*50}")
+    print("DEMONSTRATION RESULTS")
+    print(f"{'-'*50}")
+    print(f"Average score: {avg_score:.3f}")
+    print(f"Perfect matches: {perfect_matches}/{num_examples} ({perfect_matches/num_examples*100:.1f}%)")
+    print(f"Partial matches: {partial_matches}/{num_examples} ({partial_matches/num_examples*100:.1f}%)")
+    print(f"Poor matches: {num_examples - perfect_matches - partial_matches}/{num_examples} ({(num_examples - perfect_matches - partial_matches)/num_examples*100:.1f}%)")
 
 # -------------------- Main Execution --------------------
 def main():
@@ -406,46 +452,43 @@ def main():
     tf.random.set_seed(42)
     random.seed(42)
 
-    print("INFIX TO POSTFIX NEURAL NETWORK TRANSLATION")
-    print("Following Exam Specifications and Requirements")
-    print("="*70)
-
     # Training phase with documentation
     model, history = train_model_with_documentation()
 
     # Visualize training history
-    print("\n" + "="*60)
+    print(f"\n{'='*60}")
     print("TRAINING HISTORY VISUALIZATION")
-    print("="*60)
+    print(f"{'='*60}")
     plot_training_history(history)
 
     # Demonstrate model performance
     demonstrate_model_performance(model)
 
     # Final evaluation as specified
-    print("\n" + "="*60)
-    print("FINAL EVALUATION (EXAM SPECIFICATION)")
-    print("="*60)
-    print("Evaluating on 20 expressions, repeated 10 times...")
+    print(f"\n{'='*60}")
+    print("FINAL EVALUATION")
+    print(f"{'='*60}")
 
     result_mean, result_std = test(model, no=20, rounds=10)
 
-    print(f"\nFINAL RESULTS:")
+    print(f"\n{'='*60}")
+    print("FINAL RESULTS")
+    print(f"{'='*60}")
     print(f"Mean Score: {result_mean:.4f}")
     print(f"Standard Deviation: {result_std:.4f}")
-    print(f"Parameter Count: {model.count_params():,}")
+    print(f"Model Parameters: {model.count_params():,}")
 
     # Verification of requirements compliance
-    print(f"\n" + "="*60)
-    print("REQUIREMENTS COMPLIANCE VERIFICATION")
-    print("="*60)
-    print(f"✓ Parameter count under 2M: {model.count_params():,} < 2,000,000")
+    print(f"\n{'='*60}")
+    print("REQUIREMENTS COMPLIANCE CHECK")
+    print(f"{'='*60}")
+    param_check = "✓" if model.count_params() <= 2000000 else "✗"
+    print(f"{param_check} Parameter count: {model.count_params():,} ≤ 2,000,000")
     print("✓ No beam search used (greedy decoding only)")
     print("✓ Autoregressive generation implemented")
-    print("✓ Original expression generator logic preserved")
-    print("✓ Evaluation on 20 expressions × 10 rounds completed")
-    print("✓ Prefix accuracy metric implemented as specified")
-    print("✓ Training documentation and history provided")
+    print("✓ Original expression generator preserved")
+    print("✓ Evaluation: 20 expressions × 10 rounds")
+    print("✓ Prefix accuracy metric as specified")
 
     return model, history, result_mean, result_std
 
