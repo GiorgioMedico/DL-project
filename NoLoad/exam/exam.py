@@ -1,6 +1,5 @@
 import numpy as np
 import random
-import string
 import tensorflow as tf
 from tensorflow.keras import layers, models
 from tensorflow.keras.optimizers import Adam
@@ -31,9 +30,8 @@ print(f"Vocabulary size: {VOCAB_SIZE}")
 print(f"Maximum sequence length: {MAX_LEN}")
 print(f"Vocabulary: {VOCAB}")
 
-# -------------------- Expression Generation (Preserving Core Logic) --------------------
+# -------------------- Expression Generation (Provided Core Logic) --------------------
 def generate_infix_expression(max_depth):
-    """Original expression generation preserving frequency distribution by depth"""
     if max_depth == 0:
         return random.choice(IDENTIFIERS)
     elif random.random() < 0.5:
@@ -72,6 +70,10 @@ def encode(tokens, max_len=MAX_LEN):
     return ids + [PAD_ID] * (max_len - len(ids))
 
 def decode_sequence(token_ids, id_to_token, pad_token='PAD', eos_token='EOS'):
+    """
+    Converts a list of token IDs into a readable string by decoding tokens.
+    Stops at the first EOS token if present, and ignores PAD tokens.
+    """
     tokens = []
     for token_id in token_ids:
         token = id_to_token.get(token_id, '?')
@@ -98,8 +100,7 @@ def shift_right(seqs):
     return shifted
 
 # -------------------- Model Architecture --------------------
-def create_efficient_encoder_decoder_model(vocab_size=VOCAB_SIZE, max_len=MAX_LEN,
-                                          embedding_dim=128, hidden_dim=256):
+def create_efficient_encoder_decoder_model(vocab_size=VOCAB_SIZE, max_len=MAX_LEN, embedding_dim=128, hidden_dim=256):
     """
     Encoder-Decoder LSTM model optimized for parameter efficiency
     Target: Under 2M parameters while maintaining strong performance
@@ -144,15 +145,6 @@ def create_and_compile_model():
     param_count = model.count_params()
     print(f"\nModel parameter count: {param_count:,}")
 
-    if param_count > 2000000:
-        print("WARNING: Exceeding 2M parameter limit. Adjusting architecture...")
-        # Create smaller version if needed
-        model = create_efficient_encoder_decoder_model(
-            embedding_dim=96, hidden_dim=192
-        )
-        param_count = model.count_params()
-        print(f"Adjusted model parameter count: {param_count:,}")
-
     # Compile with appropriate loss and metrics
     model.compile(
         optimizer=Adam(learning_rate=0.002, clipnorm=1.0),
@@ -162,28 +154,8 @@ def create_and_compile_model():
 
     return model
 
-def analyze_dataset(X, Y, dataset_name="Dataset"):
-    """Analyze and report dataset characteristics"""
-    print(f"\n{dataset_name} Analysis:")
-    print(f"  Number of samples: {len(X):,}")
-    
-    # Analyze sequence lengths
-    input_lengths = [np.sum(x != PAD_ID) for x in X]
-    output_lengths = [np.sum(y != PAD_ID) for y in Y]
-    
-    print(f"  Input sequence lengths:")
-    print(f"    Mean: {np.mean(input_lengths):.2f}, Std: {np.std(input_lengths):.2f}")
-    print(f"    Range: {np.min(input_lengths)} to {np.max(input_lengths)}")
-    
-    print(f"  Output sequence lengths:")
-    print(f"    Mean: {np.mean(output_lengths):.2f}, Std: {np.std(output_lengths):.2f}")
-    print(f"    Range: {np.min(output_lengths)} to {np.max(output_lengths)}")
-    
-    # Analyze complexity distribution
-    complex_expressions = np.sum(np.array(output_lengths) > 5)
-    print(f"  Complex expressions (>5 tokens): {complex_expressions} ({complex_expressions/len(output_lengths)*100:.1f}%)")
 
-def train_model_with_documentation():
+def train_model():
     """
     Train model with comprehensive documentation and history tracking
     """
@@ -198,10 +170,6 @@ def train_model_with_documentation():
 
     X_val, Y_val = generate_dataset(1000)
     decoder_input_val = shift_right(Y_val)
-
-    # Analyze datasets
-    analyze_dataset(X_train, Y_train, "Training Dataset")
-    analyze_dataset(X_val, Y_val, "Validation Dataset")
 
     # Model creation
     print(f"\n{'-'*40}")
@@ -298,20 +266,19 @@ def autoregressive_decode(model, encoder_input, max_length=MAX_LEN):
 
 # -------------------- Evaluation (Exact Specification) --------------------
 def prefix_accuracy_single(y_true, y_pred, id_to_token, eos_id=EOS_ID, verbose=False):
-    """Evaluation function as provided in exam specifications"""
     t_str = decode_sequence(y_true, id_to_token).split(' EOS')[0]
     p_str = decode_sequence(y_pred, id_to_token).split(' EOS')[0]
     t_tokens = t_str.strip().split()
     p_tokens = p_str.strip().split()
-    max_len = max(len(t_tokens), len(p_tokens)) if len(p_tokens) > 0 else len(t_tokens)
+    max_len = max(len(t_tokens), len(p_tokens))
 
     match_len = sum(x == y for x, y in zip(t_tokens, p_tokens))
-    score = match_len / max_len if max_len > 0 else 0
+    score = match_len / max_len if max_len>0 else 0
 
     if verbose:
-        print(f"TARGET : {' '.join(t_tokens)}")
-        print(f"PREDICT: {' '.join(p_tokens)}")
-        print(f"PREFIX MATCH: {match_len}/{max_len} → {score:.3f}")
+        print("TARGET :", ' '.join(t_tokens))
+        print("PREDICT:", ' '.join(p_tokens))
+        print(f"PREFIX MATCH: {match_len}/{len(t_tokens)} → {score:.2f}")
 
     return score
 
@@ -333,7 +300,7 @@ def test(model, no=20, rounds=10):
     
     final_mean = np.mean(rscores)
     final_std = np.std(rscores)
-    print(f"\nEvaluation complete!")
+    print("\nEvaluation complete!")
     print(f"Mean accuracy across all rounds: {final_mean:.4f}")
     print(f"Standard deviation: {final_std:.4f}")
     
@@ -453,7 +420,7 @@ def main():
     random.seed(42)
 
     # Training phase with documentation
-    model, history = train_model_with_documentation()
+    model, history = train_model()
 
     # Visualize training history
     print(f"\n{'='*60}")
