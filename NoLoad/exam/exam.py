@@ -4,7 +4,9 @@ import tensorflow as tf
 from tensorflow.keras import layers, models
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.models import load_model
 import matplotlib.pyplot as plt
+import os
 
 # -------------------- Constants (Provided Framework) --------------------
 OPERATORS = ['+', '-', '*', '/']
@@ -22,6 +24,7 @@ SOS_ID = token_to_id['SOS']
 
 MAX_DEPTH = 3
 MAX_LEN = 4*2**MAX_DEPTH - 2
+MODEL_FILE = "full_model.keras"
 
 print("="*60)
 print("INFIX TO POSTFIX NEURAL NETWORK TRANSLATION")
@@ -155,57 +158,57 @@ def create_and_compile_model():
     return model
 
 
-def train_model(train_size=10000, val_size=1000, batch_size=64, epochs=50, 
-                learning_rate=0.002, clipnorm=1.0, early_stopping_patience=8, 
+def train_model(train_size=10000, val_size=1000, batch_size=64, epochs=50,
+                learning_rate=0.002, clipnorm=1.0, early_stopping_patience=8,
                 lr_reduction_factor=0.7, lr_reduction_patience=4, min_lr=1e-6,
                 verbose=1):
-    
+
     # Create separators
     main_separator = "=" * 60
     sub_separator = "-" * 40
-    
+
     print(f"\n{main_separator}")
     print("TRAINING PHASE")
     print(main_separator)
-    
+
     print("\nGenerating datasets...")
     print(f"  Training samples: {train_size:,}")
     print(f"  Validation samples: {val_size:,}")
-    
+
     X_train, Y_train = generate_dataset(train_size)
     decoder_input_train = shift_right(Y_train)
-    
+
     X_val, Y_val = generate_dataset(val_size)
     decoder_input_val = shift_right(Y_val)
-    
+
     # Model creation section
     print(f"\n{sub_separator}")
     print("MODEL ARCHITECTURE")
     print(sub_separator)
     model = create_and_compile_model()
     model.summary()
-    
+
     print(f"\n{sub_separator}")
     print("TRAINING CONFIGURATION")
     print(sub_separator)
-    
+
     # Create callbacks with configurable parameters
     callbacks = [
         EarlyStopping(
-            monitor='val_loss', 
-            patience=early_stopping_patience, 
-            restore_best_weights=True, 
+            monitor='val_loss',
+            patience=early_stopping_patience,
+            restore_best_weights=True,
             verbose=verbose
         ),
         ReduceLROnPlateau(
-            monitor='val_loss', 
-            factor=lr_reduction_factor, 
-            patience=lr_reduction_patience, 
-            min_lr=min_lr, 
+            monitor='val_loss',
+            factor=lr_reduction_factor,
+            patience=lr_reduction_patience,
+            min_lr=min_lr,
             verbose=verbose
         )
     ]
-    
+
     # Display all configuration parameters
     print(f"Optimizer: Adam (lr={learning_rate}, clipnorm={clipnorm})")
     print("Loss function: sparse_categorical_crossentropy")
@@ -215,11 +218,11 @@ def train_model(train_size=10000, val_size=1000, batch_size=64, epochs=50,
     print(f"  - Early stopping: patience={early_stopping_patience}, monitor=val_loss")
     print(f"  - Learning rate reduction: factor={lr_reduction_factor}, patience={lr_reduction_patience}")
     print(f"  - Minimum learning rate: {min_lr}")
-    
+
     print(f"\n{sub_separator}")
     print("TRAINING EXECUTION")
     print(sub_separator)
-    
+
     # Training with all configurable parameters
     history = model.fit(
         [X_train, decoder_input_train], Y_train,
@@ -229,12 +232,12 @@ def train_model(train_size=10000, val_size=1000, batch_size=64, epochs=50,
         callbacks=callbacks,
         verbose=verbose
     )
-    
+
     # Training analysis section
     print(f"\n{sub_separator}")
     print("TRAINING RESULTS")
     print(sub_separator)
-    
+
     # Extract training metrics
     final_train_acc = history.history['accuracy'][-1]
     final_val_acc = history.history['val_accuracy'][-1]
@@ -242,7 +245,7 @@ def train_model(train_size=10000, val_size=1000, batch_size=64, epochs=50,
     final_val_loss = history.history['val_loss'][-1]
     best_val_acc = max(history.history['val_accuracy'])
     epochs_trained = len(history.history['loss'])
-    
+
     # Display results with improved formatting
     print(f"Training completed after {epochs_trained} epochs")
     print(f"Final training accuracy: {final_train_acc:.4f}")
@@ -250,7 +253,11 @@ def train_model(train_size=10000, val_size=1000, batch_size=64, epochs=50,
     print(f"Best validation accuracy: {best_val_acc:.4f}")
     print(f"Final training loss: {final_train_loss:.4f}")
     print(f"Final validation loss: {final_val_loss:.4f}")
-    
+
+    print(f"\nSaving full model to {MODEL_FILE}...")
+    model.save(MODEL_FILE)
+    print("Model saved successfully.")
+
     return model, history
 
 # -------------------- Autoregressive Generation --------------------
@@ -319,27 +326,27 @@ def test(model, no=20, rounds=10):
         round_mean = np.mean(scores)
         rscores.append(round_mean)
         print(f"  Round {i+1} accuracy: {round_mean:.4f}")
-    
+
     final_mean = np.mean(rscores)
     final_std = np.std(rscores)
     print("\nEvaluation complete!")
     print(f"Mean accuracy across all rounds: {final_mean:.4f}")
     print(f"Standard deviation: {final_std:.4f}")
-    
+
     return final_mean, final_std
 
 # -------------------- Visualization and Analysis --------------------
 def plot_training_history(history):
-    
+
     # Extract history data
     loss_history = history.history['loss']
     val_loss_history = history.history['val_loss']
     acc_history = history.history['accuracy']
     val_acc_history = history.history['val_accuracy']
-    
+
     # Create figure with subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-    
+
     # Loss plot
     ax1.plot(loss_history, label='Training Loss', linewidth=2, color='blue')
     ax1.plot(val_loss_history, label='Validation Loss', linewidth=2, color='red')
@@ -348,8 +355,8 @@ def plot_training_history(history):
     ax1.set_ylabel('Loss', fontsize=12)
     ax1.legend(fontsize=11)
     ax1.grid(True, alpha=0.3)
-    
-    # Accuracy plot  
+
+    # Accuracy plot
     ax2.plot(acc_history, label='Training Accuracy', linewidth=2, color='green')
     ax2.plot(val_acc_history, label='Validation Accuracy', linewidth=2, color='orange')
     ax2.set_title('Accuracy During Training', fontsize=14, fontweight='bold')
@@ -357,10 +364,10 @@ def plot_training_history(history):
     ax2.set_ylabel('Accuracy', fontsize=12)
     ax2.legend(fontsize=11)
     ax2.grid(True, alpha=0.3)
-    
+
     plt.tight_layout()
     plt.show()
-    
+
     # Print training summary
     epochs_trained = len(loss_history)
     final_train_loss = loss_history[-1]
@@ -368,7 +375,7 @@ def plot_training_history(history):
     final_train_acc = acc_history[-1]
     final_val_acc = val_acc_history[-1]
     best_val_acc = max(val_acc_history)
-    
+
     print(f"\n{'-'*50}")
     print("TRAINING SUMMARY")
     print(f"{'-'*50}")
@@ -421,7 +428,7 @@ def demonstrate_model_performance(model, num_examples=10):
         print()
 
     avg_score = total_score / num_examples
-    
+
     print(f"{'-'*50}")
     print("DEMONSTRATION RESULTS")
     print(f"{'-'*50}")
@@ -431,7 +438,7 @@ def demonstrate_model_performance(model, num_examples=10):
     print(f"Poor matches: {num_examples - perfect_matches - partial_matches}/{num_examples} ({(num_examples - perfect_matches - partial_matches)/num_examples*100:.1f}%)")
 
 # -------------------- Main Execution --------------------
-def main():
+def main(load = True):
     """Main execution"""
 
     # Set random seeds for reproducibility
@@ -439,14 +446,24 @@ def main():
     tf.random.set_seed(42)
     random.seed(42)
 
-    # Training phase with documentation
-    model, history = train_model()
+    model, history = None, None
+    if load and os.path.exists(MODEL_FILE):
+        print(f"\nLoading full model from {MODEL_FILE}...")
+        model = models.load_model(MODEL_FILE)
+        print("Model loaded successfully.")
+        model.summary()
+    else:
+        if load:
+            print(f"\nModel file '{MODEL_FILE}' not found. Training a new model.")
+        # Training phase with documentation
+        model, history = train_model()
 
-    # Visualize training history
-    print(f"\n{'='*60}")
-    print("TRAINING HISTORY VISUALIZATION")
-    print(f"{'='*60}")
-    plot_training_history(history)
+    # Visualize training history if training was performed
+    if history:
+        print(f"\n{'='*60}")
+        print("TRAINING HISTORY VISUALIZATION")
+        print(f"{'='*60}")
+        plot_training_history(history)
 
     # Demonstrate model performance
     demonstrate_model_performance(model)
@@ -469,4 +486,8 @@ def main():
 
 # Execute main function
 if __name__ == "__main__":
-    main()
+    
+    # --- Execute the main function ---
+    # Set `load=False` to force retraining the model from scratch.
+    # If `load=True`, it will use a saved model file if it exists.
+    main(load=False)
