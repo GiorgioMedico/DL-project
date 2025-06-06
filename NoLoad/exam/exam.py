@@ -155,79 +155,102 @@ def create_and_compile_model():
     return model
 
 
-def train_model():
-    """
-    Train model with comprehensive documentation and history tracking
-    """
-    print("\n" + "="*60)
+def train_model(train_size=10000, val_size=1000, batch_size=64, epochs=50, 
+                learning_rate=0.002, clipnorm=1.0, early_stopping_patience=8, 
+                lr_reduction_factor=0.7, lr_reduction_patience=4, min_lr=1e-6,
+                verbose=1):
+    
+    # Create separators
+    main_separator = "=" * 60
+    sub_separator = "-" * 40
+    
+    print(f"\n{main_separator}")
     print("TRAINING PHASE")
-    print("="*60)
-
-    # Data generation
+    print(main_separator)
+    
     print("\nGenerating datasets...")
-    X_train, Y_train = generate_dataset(10000)
+    print(f"  Training samples: {train_size:,}")
+    print(f"  Validation samples: {val_size:,}")
+    
+    X_train, Y_train = generate_dataset(train_size)
     decoder_input_train = shift_right(Y_train)
-
-    X_val, Y_val = generate_dataset(1000)
+    
+    X_val, Y_val = generate_dataset(val_size)
     decoder_input_val = shift_right(Y_val)
-
-    # Model creation
-    print(f"\n{'-'*40}")
+    
+    # Model creation section
+    print(f"\n{sub_separator}")
     print("MODEL ARCHITECTURE")
-    print(f"{'-'*40}")
+    print(sub_separator)
     model = create_and_compile_model()
     model.summary()
-
-    # Training configuration
-    print(f"\n{'-'*40}")
-    print("TRAINING CONFIGURATION")
-    print(f"{'-'*40}")
     
+    print(f"\n{sub_separator}")
+    print("TRAINING CONFIGURATION")
+    print(sub_separator)
+    
+    # Create callbacks with configurable parameters
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=8, restore_best_weights=True, verbose=1),
-        ReduceLROnPlateau(monitor='val_loss', factor=0.7, patience=4, min_lr=1e-6, verbose=1)
+        EarlyStopping(
+            monitor='val_loss', 
+            patience=early_stopping_patience, 
+            restore_best_weights=True, 
+            verbose=verbose
+        ),
+        ReduceLROnPlateau(
+            monitor='val_loss', 
+            factor=lr_reduction_factor, 
+            patience=lr_reduction_patience, 
+            min_lr=min_lr, 
+            verbose=verbose
+        )
     ]
-
-    print("Optimizer: Adam (lr=0.002, clipnorm=1.0)")
+    
+    # Display all configuration parameters
+    print(f"Optimizer: Adam (lr={learning_rate}, clipnorm={clipnorm})")
     print("Loss function: sparse_categorical_crossentropy")
-    print("Batch size: 64")
-    print("Max epochs: 50")
+    print(f"Batch size: {batch_size}")
+    print(f"Max epochs: {epochs}")
     print("Callbacks:")
-    print("  - Early stopping: patience=8, monitor=val_loss")
-    print("  - Learning rate reduction: factor=0.7, patience=4")
-
-    # Training execution
-    print(f"\n{'-'*40}")
+    print(f"  - Early stopping: patience={early_stopping_patience}, monitor=val_loss")
+    print(f"  - Learning rate reduction: factor={lr_reduction_factor}, patience={lr_reduction_patience}")
+    print(f"  - Minimum learning rate: {min_lr}")
+    
+    print(f"\n{sub_separator}")
     print("TRAINING EXECUTION")
-    print(f"{'-'*40}")
-
+    print(sub_separator)
+    
+    # Training with all configurable parameters
     history = model.fit(
         [X_train, decoder_input_train], Y_train,
-        batch_size=64,
-        epochs=50,
+        batch_size=batch_size,
+        epochs=epochs,
         validation_data=([X_val, decoder_input_val], Y_val),
         callbacks=callbacks,
-        verbose=1
+        verbose=verbose
     )
-
-    # Training analysis
-    print(f"\n{'-'*40}")
+    
+    # Training analysis section
+    print(f"\n{sub_separator}")
     print("TRAINING RESULTS")
-    print(f"{'-'*40}")
+    print(sub_separator)
+    
+    # Extract training metrics
     final_train_acc = history.history['accuracy'][-1]
     final_val_acc = history.history['val_accuracy'][-1]
     final_train_loss = history.history['loss'][-1]
     final_val_loss = history.history['val_loss'][-1]
     best_val_acc = max(history.history['val_accuracy'])
     epochs_trained = len(history.history['loss'])
-
+    
+    # Display results with improved formatting
     print(f"Training completed after {epochs_trained} epochs")
     print(f"Final training accuracy: {final_train_acc:.4f}")
     print(f"Final validation accuracy: {final_val_acc:.4f}")
     print(f"Best validation accuracy: {best_val_acc:.4f}")
     print(f"Final training loss: {final_train_loss:.4f}")
     print(f"Final validation loss: {final_val_loss:.4f}")
-
+    
     return model, history
 
 # -------------------- Autoregressive Generation --------------------
@@ -247,7 +270,7 @@ def autoregressive_decode(model, encoder_input, max_length=MAX_LEN):
         # Get predictions from model
         predictions = model.predict([encoder_input, decoder_input], verbose=0)
 
-        # Select next token (greedy decoding - no beam search allowed)
+        # Select next token (greedy decoding)
         next_token = np.argmax(predictions[0, i-1, :])
 
         # Update decoder input and generated sequence
@@ -283,7 +306,6 @@ def prefix_accuracy_single(y_true, y_pred, id_to_token, eos_id=EOS_ID, verbose=F
     return score
 
 def test(model, no=20, rounds=10):
-    """Evaluation function exactly as specified in exam requirements"""
     print(f"Evaluating model performance on {no} expressions × {rounds} rounds...")
     rscores = []
     for i in range(rounds):
@@ -308,7 +330,6 @@ def test(model, no=20, rounds=10):
 
 # -------------------- Visualization and Analysis --------------------
 def plot_training_history(history):
-    """Plot comprehensive training history following examples from documents"""
     
     # Extract history data
     loss_history = history.history['loss']
@@ -359,7 +380,6 @@ def plot_training_history(history):
     print(f"Best validation accuracy: {best_val_acc:.4f}")
 
 def demonstrate_model_performance(model, num_examples=10):
-    """Demonstrate model performance on sample expressions with improved formatting"""
     print(f"\n{'='*70}")
     print("MODEL PERFORMANCE DEMONSTRATION")
     print(f"{'='*70}")
@@ -375,7 +395,7 @@ def demonstrate_model_performance(model, num_examples=10):
     for i in range(num_examples):
         encoder_input = X_demo[i]
         target = Y_demo[i]
-        generated = autoregressive_decode(model, encoder_input)[1:]  # Remove SOS
+        generated = autoregressive_decode(model, encoder_input)[1:]
 
         infix_str = decode_sequence(encoder_input, id_to_token)
         target_str = decode_sequence(target, id_to_token)
@@ -412,7 +432,7 @@ def demonstrate_model_performance(model, num_examples=10):
 
 # -------------------- Main Execution --------------------
 def main():
-    """Main execution following exam specifications"""
+    """Main execution"""
 
     # Set random seeds for reproducibility
     np.random.seed(42)
@@ -445,20 +465,8 @@ def main():
     print(f"Standard Deviation: {result_std:.4f}")
     print(f"Model Parameters: {model.count_params():,}")
 
-    # Verification of requirements compliance
-    print(f"\n{'='*60}")
-    print("REQUIREMENTS COMPLIANCE CHECK")
-    print(f"{'='*60}")
-    param_check = "✓" if model.count_params() <= 2000000 else "✗"
-    print(f"{param_check} Parameter count: {model.count_params():,} ≤ 2,000,000")
-    print("✓ No beam search used (greedy decoding only)")
-    print("✓ Autoregressive generation implemented")
-    print("✓ Original expression generator preserved")
-    print("✓ Evaluation: 20 expressions × 10 rounds")
-    print("✓ Prefix accuracy metric as specified")
-
     return model, history, result_mean, result_std
 
 # Execute main function
 if __name__ == "__main__":
-    model, history, final_mean, final_std = main()
+    main()
